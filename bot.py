@@ -54,7 +54,7 @@ async def on_message(message):
             await main_module[command["name"]]["run"](command["params"], message)
         else:
             embed = discord.Embed(title="Help",
-                                  description="Looks like you're trying to tell me to do something. Well, I can only do one thing, and that is to OwO-ify your server! **Here are my commands**:",
+                                  description="Some message",
                                   color=0x7289da)
             for i in list(main_module.keys()):
                 embed.add_field(name="!o" + i + " " + main_module[i].get("params", ""), value=main_module[i]["desc"],
