@@ -1,10 +1,13 @@
 import discord
 import asyncio
+import os
+import random
 
 client = discord.Client()
 
 TYPING_SPEED = 0.25
 POSTFIX = "~"
+IMAGE_DIRS = ["bts"]
 
 def getCommand(message):
     things = message[:-1].lower().split()
@@ -27,11 +30,28 @@ async def sendMessage(rslt, channel):
         await send(rslt, channel)
 async def test(a, b):
     await sendMessage("tested", b.channel)
+async def image(a, b):
+    await client.send_file(b.channel, a[0] + "/" + random.choice(os.listdir(a[0])))
 
-main_module = {
+
+def listToText(list):
+    str = ""
+    for i in range(len(list)):
+        if i != len(list) - 1:
+            str += list[i] + ","
+        else:
+            str += list[i]
+    return list[i]
+
+commands = {
     "test":{
         "run": test,
         "desc": "a test"
+    },
+    "image":{
+        "run": image,
+        "params": "[category]",
+        "desc": "displays an image from a category. Current categories are: " + listToText(IMAGE_DIRS)
     }
 }
 
@@ -41,6 +61,7 @@ async def on_ready():
     print(client.user.name)
     print(client.user.id)
     print('------')
+    await client.change_presence(game=discord.Game(name='help~'))
 
 @client.event
 async def on_message(message):
@@ -49,15 +70,15 @@ async def on_message(message):
     if is_command:
         command = getCommand(message.content)
         print(command)
-        if command["name"] in list(main_module.keys()):
+        if command["name"] in list(commands.keys()):
             print("Command " + command["name"] + POSTFIX + " was used!")
-            await main_module[command["name"]]["run"](command["params"], message)
+            await commands[command["name"]]["run"](command["params"], message)
         else:
             embed = discord.Embed(title="Help",
                                   description="Some message",
                                   color=0x7289da)
-            for i in list(main_module.keys()):
-                embed.add_field(name="!o" + i + " " + main_module[i].get("params", ""), value=main_module[i]["desc"],
+            for i in list(commands.keys()):
+                embed.add_field(name=i + commands[i].get("params", "") + "~", value=commands[i]["desc"],
                                 inline=False)
             await client.send_message(message.channel, embed=embed)
 
