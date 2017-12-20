@@ -35,6 +35,8 @@ async def test(a, b):
 
 async def image(a, b):
     await client.send_file(b.channel, a[0] + "/" + random.choice(os.listdir(a[0])))
+async def mhelp(a, b):
+    await sendMessage("tested", b.channel)
 
 
 def listToText(list):
@@ -130,10 +132,6 @@ class Player(object):
 
                     self.author.sendMessage("This person is ")
         self.done = True
-
-
-async def mhelp(a, b):
-    await sendMessage("tested", b.channel)
 
 
 # end of mafia shit
