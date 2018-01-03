@@ -8,7 +8,10 @@ client = discord.Client()
 
 TYPING_SPEED = 0.25
 POSTFIX = "~"
-IMAGE_DIRS = ["bts"]
+IMAGE_DIRS = ["bts", "anime"]
+
+# mafia
+# end of mafia
 
 def getCommand(message):
     things = message[:-1].lower().split()
