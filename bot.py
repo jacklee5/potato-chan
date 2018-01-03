@@ -2,6 +2,7 @@ import discord
 import asyncio
 import os
 import random
+from RPS import *
 
 client = discord.Client()
 
@@ -37,6 +38,9 @@ async def image(a, b):
     await client.send_file(b.channel, a[0] + "/" + random.choice(os.listdir(a[0])))
 async def mhelp(a, b):
     await sendMessage("tested", b.channel)
+async def rpshelp(a, b):
+    await sendMessage("", b.channel)
+    # TODO: write the helpy thingy
 
 
 def listToText(list):
@@ -61,6 +65,10 @@ commands = {
     "mhelp":{
         "run": mhelp,
         "desc": "Instructions for mafia."
+    },
+    "rpshelp":{
+        "run": rpshelp,
+        "desc": "Instructions for rock-paper-scissors tournament"
     }
 }
 
