@@ -129,6 +129,10 @@ commands = {
     "rpshelp":{
         "run": rpshelp,
         "desc": "Instructions for rock-paper-scissors tournament"
+    },
+    "mstart":{
+        "run": mstart,
+        "desc": "Creates a mafia game and if there is one, adds you."
     }
 }
 
