@@ -1,6 +1,7 @@
 import discord
 import asyncio
 import os
+import threading
 import random
 from RPS import *
 
@@ -9,8 +10,64 @@ client = discord.Client()
 TYPING_SPEED = 0.25
 POSTFIX = "~"
 IMAGE_DIRS = ["bts", "anime"]
+mafiagames = {
+
+}
 
 # mafia
+
+
+class MGameManager(object):
+    def __init__(self, a, b):
+        self.started = False
+        self.playerList = []
+        threading.Timer(300, self.timeout_start()).start()
+        self.forced_turns = 0
+        self.a = a
+        self.b = b
+
+    def add_player(self, player):
+        not_added = True
+        for i in range (len(self.playerList)):
+            if self.playerList[i].id == player:
+                not_added = False
+                player.sendMessage("You are already in the game!")
+        if not_added:
+            self.playerList.append(MPlayer(player))
+            player.sendMessage("You have been added to the game!")
+
+    def timeout_start(self):
+        if not self.started and len(self.playerList) < 4:
+            del self
+
+    def timeout_restart(self):
+        self.timer.cancel()
+        self.timer = threading.Timer(300, self.delete()).start()
+        self.forced_turns += 1
+        self.delete()
+
+    async def delete(self):
+        if self.forced_turns > 3:
+            await sendMessage("The game has ended due to inactivity!", self.b.channel)
+            del self
+
+
+class MPlayer(object):
+    def __init__(self, player):
+        self.is_dead = False
+        self.player_type = ""
+        self.will_kill = False
+        self.will_heal = False
+        self.is_done = False
+        self.id = player
+
+def mstart(a, b):
+    if not (mafiagames.get(bool(b.channel.id), False)):
+        mafiagames[b.channel.id] = MGameManager(a, b)
+        mafiagames[b.channel.id].addplayer(b.author)
+    else:
+        mafiagames[b.channel.id].addplayer(b.author)
+
 # end of mafia
 
 def getCommand(message):
@@ -74,78 +131,6 @@ commands = {
         "desc": "Instructions for rock-paper-scissors tournament"
     }
 }
-
-# mafia shit
-class Player(object):
-    def __init__(self, a, b):
-        self.author = b.author
-        self.name = b.author.name
-        self.profession = ""
-        self.isdead = False
-        self.isheal = False
-        self.channel = b.channel
-        self.done = False
-
-    def changejob(self, newjob):
-        self.profession = newjob
-        self.author.sendMessage("You are a " + newjob + "!")
-
-    async def killin(self):
-        if self.isheal:
-            await sendMessage("The mafia tried to kill " + self.name + ", but they were healed!", self.channel)
-            self.isheal = False
-        else:
-            await sendMessage("The mafia successfully killed " + self.name + "! ", self.channel)
-            self.isdead = True
-
-    def healout(self, who):
-        global mafiaplayerlist
-        if self.isdead:
-            self.author.sendMessage("You can't heal someone if you're dead!")
-        elif self.profession != "doctor":
-            self.author.sendMessage("You don't have the skill to save someone!")
-        else:
-            for i in range (len(mafiaplayerlist)):
-                if mafiaplayerlist[i].isdead:
-                    self.author.sendMessage("You can't heal a dead person!")
-                elif mafiaplayerlist[i].name == who:
-                    mafiaplayerlist[i].healin()
-        self.done = True
-
-    def healin(self):
-        self.isheal = True
-
-    def killout(self, who):
-        global mafiaplayerlist
-        if self.isdead:
-            self.author.sendMessage("You can't kill someone if you're dead!")
-        elif self.profession != "mafia":
-            self.author.sendMessage("You probably shouldn't kill someone!")
-        else:
-            for i in range (len(mafiaplayerlist)):
-                if mafiaplayerlist[i].isdead:
-                    self.author.sendMessage("You can't kill a dead person!")
-                elif mafiaplayerlist[i].name == who:
-                    mafiaplayerlist[i].killin()
-        self.done = True
-
-    def detect(self, who):
-        global mafiaplayerlist
-        if self.isdead:
-            self.author.sendMessage("You can't detect someone if you're dead!")
-        elif self.profession != "detective":
-            self.author.sendMessage("You don't have the skill to study this person!")
-        else:
-            for i in range(len(mafiaplayerlist)):
-                if mafiaplayerlist[i].isdead:
-                    self.author.sendMessage("This body is far too ruined to detect!")
-                elif mafiaplayerlist[i].name == who:
-
-                    self.author.sendMessage("This person is ")
-        self.done = True
-
-
-# end of mafia shit
 
 @client.event
 async def on_ready():
