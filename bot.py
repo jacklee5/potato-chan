@@ -26,15 +26,15 @@ class MGameManager(object):
         self.a = a
         self.b = b
 
-    def add_player(self, player):
+    async def add_player(self, player):
         not_added = True
         for i in range (len(self.playerList)):
             if self.playerList[i].id == player:
                 not_added = False
-                player.sendMessage("You are already in the game!")
+                await client.send_message(player, "You are already in the game!")
         if not_added:
             self.playerList.append(MPlayer(player))
-            player.sendMessage("You have been added to the game!")
+            await client.send_message(player, "You have been added to the game!")
 
     def timeout_start(self):
         if not self.started and len(self.playerList) < 4:
