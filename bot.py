@@ -64,9 +64,9 @@ class MPlayer(object):
 def mstart(a, b):
     if not (mafiagames.get(bool(b.channel.id), False)):
         mafiagames[b.channel.id] = MGameManager(a, b)
-        mafiagames[b.channel.id].addplayer(b.author)
+        mafiagames[b.channel.id].add_player(b.author)
     else:
-        mafiagames[b.channel.id].addplayer(b.author)
+        mafiagames[b.channel.id].add_player(b.author)
 
 # end of mafia
 
