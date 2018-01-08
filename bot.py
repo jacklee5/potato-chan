@@ -2,7 +2,6 @@ import discord
 import asyncio
 import os
 import random
-from RPS import *
 
 client = discord.Client()
 
