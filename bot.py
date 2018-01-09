@@ -3,6 +3,7 @@ import asyncio
 import os
 import threading
 import random
+import copy
 
 client = discord.Client()
 
@@ -138,13 +139,19 @@ class MGameManager(object):
         self.b = b
 
     async def add_player(self, b):
-        new_list=self.playerList.append(MPlayer(b))
-        if new_list != self.playerList:
-            self.playerList = new_list
+        new_player = MPlayer(b)
+        is_new = True
+        for i in range (len(self.playerList)):
+            if new_player.id == self.playerList[i].id:
+                is_new = False
+
+        if is_new:
+            self.playerList.append(copy.copy(new_player))
             await client.send_message(b.author, "You have been added to the game!")
             print(self.playerList)
         else:
             await client.send_message(b.author, "You were already in the game!")
+            print(self.playerList)
 
     def timeout_start(self):
         if not self.started and len(self.playerList) < 4:
@@ -169,11 +176,13 @@ class MPlayer(object):
         self.will_kill = False
         self.will_heal = False
         self.is_done = False
+        self.name = player.author.name
         self.id = player.author.id
         self.channel = player.channel
 
 async def mstart(a, b):
-    if not (mafiagames.get(bool(b.channel.id), False)):
+    print(mafiagames)
+    if b.channel.id not in mafiagames.keys():
         mafiagames[b.channel.id] = MGameManager(a, b)
         await mafiagames[b.channel.id].add_player(b)
     else:
@@ -265,12 +274,13 @@ async def on_ready():
 
 @client.event
 async def on_message(message):
-    is_command = message.content.lower().endswith(postfixes.get(message.server.id, POSTFIX)) and not (
-    message.author.id == client.user.id)
     try:
         print("User " + message.author.name + " on Channel " + message.channel.name + " on " + message.server.name + " says " + message.content)
+        is_command = message.content.lower().endswith(postfixes.get(message.server.id, POSTFIX)) and not (
+        message.author.id == client.user.id)
     except:
         print("User " + message.author.name + " on a Direct Message says " + message.content)
+        is_command = False
     if is_command:
         command = getCommand(message.content)
         print(command)
