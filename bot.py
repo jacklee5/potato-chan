@@ -26,15 +26,11 @@ class MGameManager(object):
         self.a = a
         self.b = b
 
-    async def add_player(self, player):
-        not_added = True
-        for i in range (len(self.playerList)):
-            if self.playerList[i].id == player:
-                not_added = False
-                await client.send_message(player, "You are already in the game!")
-        if not_added:
-            self.playerList.append(MPlayer(player))
-            await client.send_message(player, "You have been added to the game!")
+    async def add_player(self, b):
+        if
+            self.playerList.append(MPlayer(b))
+            await client.send_message(b.author, "You have been added to the game!")
+            print(self.playerList)
 
     def timeout_start(self):
         if not self.started and len(self.playerList) < 4:
@@ -59,14 +55,14 @@ class MPlayer(object):
         self.will_kill = False
         self.will_heal = False
         self.is_done = False
-        self.id = player
+        self.id = player.author
 
-def mstart(a, b):
+async def mstart(a, b):
     if not (mafiagames.get(bool(b.channel.id), False)):
         mafiagames[b.channel.id] = MGameManager(a, b)
-        mafiagames[b.channel.id].add_player(b.author)
+        await mafiagames[b.channel.id].add_player(b)
     else:
-        mafiagames[b.channel.id].add_player(b.author)
+        await mafiagames[b.channel.id].add_player(b)
 
 # end of mafia
 
@@ -117,11 +113,11 @@ commands = {
         "run": test,
         "desc": "a test"
     },
-    "image":{
-        "run": image,
-        "params": "[category]",
-        "desc": "displays an image from a category. Current categories are: " + listToText(IMAGE_DIRS)
-    },
+    # "image":{
+    #     "run": image,
+    #     "params": "[category]",
+    #     "desc": "displays an image from a category. Current categories are: " + listToText(IMAGE_DIRS)
+    # },
     "mhelp":{
         "run": mhelp,
         "desc": "Instructions for mafia."
@@ -147,7 +143,10 @@ async def on_ready():
 @client.event
 async def on_message(message):
     is_command = message.content.lower().endswith(POSTFIX) and not (message.author.id == client.user.id)
-    print("User " + message.author.name + " on Channel " + message.channel.name + " on " + message.server.name + " says " + message.content)
+    try:
+        print("User " + message.author.name + " on Channel " + message.channel.name + " on " + message.server.name + " says " + message.content)
+    except:
+        print("User " + message.author.name + " on a Direct Message says " + message.content)
     if is_command:
         command = getCommand(message.content)
         print(command)
