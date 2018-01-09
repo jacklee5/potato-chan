@@ -26,10 +26,13 @@ class MGameManager(object):
         self.b = b
 
     async def add_player(self, b):
-        if
-            self.playerList.append(MPlayer(b))
+        new_list=self.playerList.append(MPlayer(b))
+        if new_list != self.playerList:
+            self.playerList = new_list
             await client.send_message(b.author, "You have been added to the game!")
             print(self.playerList)
+        else:
+            await client.send_message(b.author, "You were already in the game!")
 
     def timeout_start(self):
         if not self.started and len(self.playerList) < 4:
@@ -54,7 +57,8 @@ class MPlayer(object):
         self.will_kill = False
         self.will_heal = False
         self.is_done = False
-        self.id = player.author
+        self.id = player.author.id
+        self.channel = player.channel
 
 async def mstart(a, b):
     if not (mafiagames.get(bool(b.channel.id), False)):
