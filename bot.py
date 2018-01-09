@@ -3,7 +3,6 @@ import asyncio
 import os
 import threading
 import random
-from RPS import *
 
 client = discord.Client()
 
