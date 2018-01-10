@@ -11,6 +11,7 @@ TYPING_SPEED = 0.25
 POSTFIX = "~"
 IMAGE_DIRS = ["bts"]
 postfixes = {}
+COLOR = 0x2956b2
 
 
 class RPSPlayer(object):
@@ -287,13 +288,39 @@ async def on_message(message):
         if command["name"] in list(commands.keys()):
             print("Command " + command["name"] + POSTFIX + " was used!")
             await commands[command["name"]]["run"](command["params"], message)
+        elif command["name"] == "help":
+            if len(command["params"]) > 0:
+                c = command["params"][0]
+                if c in list(commands.keys()):
+                    embed = discord.Embed(title="Help for " + c,
+                                          color=COLOR)
+                    embed.add_field(name="Usage:",value=c + (" " + (commands[c].get("params","")) if "param" in list(commands[c].keys()) else "") + postfixes.get(message.server.id, POSTFIX))
+                    embed.add_field(name="Description:",value=commands[c]["desc"])
+                    await client.send_message(message.channel, embed=embed)
+                else:
+                    await sendMessage("That's not a valid command!",message.channel)
+            else:
+                embed = discord.Embed(title="Help",
+                                      description="Use help [command]" + postfixes.get(message.server.id,
+                                                                                       POSTFIX) + " to get help for a specfic command",
+                                      color=COLOR)
+                string = ""
+                for i in commands:
+                    string += i + ", "
+                string = string[:-2]
+                embed.add_field(name="Here are my commands: ", value=string)
+                await client.send_message(message.channel, embed=embed)
+
+
         else:
             embed = discord.Embed(title="Help",
-                                  description="Some message",
-                                  color=0x7289da)
-            for i in list(commands.keys()):
-                embed.add_field(name=i + commands[i].get("params", "") + "~", value=commands[i]["desc"],
-                                inline=False)
+                                  description="Use help [command]" + postfixes.get(message.server.id, POSTFIX) + " to get help for a specfic command",
+                                  color=COLOR)
+            string = ""
+            for i in commands:
+                string+=i + ", "
+            string = string[:-2]
+            embed.add_field(name="Here are my commands: ", value = string)
             await client.send_message(message.channel, embed=embed)
 
 client.run('MzkwNTgwOTgxMzE0MDkzMDU2.DRN65Q.-6OaVHeudI3zaPeDAjXWTJMw0Zw')
