@@ -134,10 +134,59 @@ class MGameManager(object):
     def __init__(self, a, b):
         self.started = False
         self.playerList = []
-        threading.Timer(300, self.timeout_start()).start()
         self.forced_turns = 0
         self.a = a
         self.b = b
+        beginning_timeout = asyncio.get_event_loop()
+        beginning_timeout.run_until_complete(self.timeout_start)
+        self.leader = b.author
+        self.isday = True
+        self.time = {
+            True: "day",
+            False: "night"
+        }
+        self.force_continue_loop = asyncio.get_event_loop()
+        self.not_assigned = []
+        self.mafias = 0
+
+    async def game_start(self):
+        if len(self.playerList) < 4:
+            await client.send_message(self.leader, "There are not enough players; there are only " + str(len(self.playerList)))
+        else:
+            self.started = True
+            await sendMessage("Assigning roles!")
+            for i in range (len(self.playerList)):
+                self.not_assigned.append(i)
+            self.mafias = len(self.playerList) - (len(self.playerList) // 2)
+            for i in range (self.mafias):
+                mafia_index = random.choice(self.not_assigned)
+                self.playerList[mafia_index].playertype = 'mafia'
+                await client.send_message(self.playerList[mafia_index].author, 'You are in the mafia. At night, use "mkill [player]~"')
+                self.not_assigned.remove(mafia_index)
+            # doctor and detective
+            doctor = random.choice(self.not_assigned)
+            self.playerList[doctor].player_type = 'doctor'
+            await client.send_message(self.playerList[doctor].author, 'You are the doctor. At night, use "mheal [player]~"')
+            self.not_assigned.remove(doctor)
+            detective = random.choice(self.not_assigned)
+            self.playerList[detective].player_type = 'detective'
+            await client.send_message(self.playerList[doctor].author, 'You are the detective. At night, use "minspect [player]~"')
+            self.not_assigned.remove(detective)
+            for i in range (len(self.not_assigned)):
+                self.not_assigned[i].playertype = 'innocent'
+                await client.send_message(self.playerList[i].author, "You are innocent. Don't die!")
+            await sendMessage('In the mornings, do "mvote [player]" to vote to lynch someone!', self.b.channel)
+        self.night()
+
+    async def day(self):
+        await sendMessage("Good morning!", self.b.channel)
+
+    async def night(self):
+        await sendMessage("Good night!", self.b.channel)
+        self.turn_force = asyncio.get_event_loop()
+        self.turn_force.run_until_complete(self.timeout_start)
+        self.isday = False
+        self.turn_force.stop()
 
     async def add_player(self, b):
         new_player = MPlayer(b)
@@ -145,29 +194,32 @@ class MGameManager(object):
         for i in range (len(self.playerList)):
             if new_player.id == self.playerList[i].id:
                 is_new = False
-
         if is_new:
             self.playerList.append(copy.copy(new_player))
             await client.send_message(b.author, "You have been added to the game!")
-            print(self.playerList)
         else:
             await client.send_message(b.author, "You were already in the game!")
-            print(self.playerList)
 
-    def timeout_start(self):
+    async def timeout_start(self):
+        asyncio.sleep(300)
         if not self.started and len(self.playerList) < 4:
-            del self
-
-    def timeout_restart(self):
-        self.timer.cancel()
-        self.timer = threading.Timer(300, self.delete()).start()
-        self.forced_turns += 1
-        self.delete()
-
-    async def delete(self):
-        if self.forced_turns > 3:
             await sendMessage("The game has ended due to inactivity!", self.b.channel)
             del self
+
+    async def timeout_restart(self):
+        asyncio.sleep(240)
+        await sendMessage("60 seconds until the " + self.time[self.isday] + " ends!", self.b.channel)
+        asyncio.sleep(30)
+        await sendMessage("30 seconds until the " + self.time[self.isday] + " ends!", self.b.channel)
+        asyncio.sleep(15)
+        await sendMessage("15 seconds until the " + self.time[self.isday] + " ends!", self.b.channel)
+        asyncio.sleep(10)
+        await sendMessage("5 seconds until the " + self.time[self.isday] + " ends!", self.b.channel)
+        self.forced_turns += 1
+
+    async def delete(self):
+        await sendMessage("The game has ended due to inactivity!", self.b.channel)
+        del self
 
 
 class MPlayer(object):
@@ -179,13 +231,17 @@ class MPlayer(object):
         self.is_done = False
         self.name = player.author.name
         self.id = player.author.id
+        self.author = player.author
         self.channel = player.channel
 
 async def mstart(a, b):
-    print(mafiagames)
     if b.channel.id not in mafiagames.keys():
         mafiagames[b.channel.id] = MGameManager(a, b)
         await mafiagames[b.channel.id].add_player(b)
+        await client.send_message(b.author, "Repeat this command if there are 4 or more players to begin!")
+    elif b.author.id == mafiagames[b.channel.id].leader.id:
+        mafiagames[b.channel.id].started = True
+        mafiagames[b.channel.id].game_start()
     else:
         await mafiagames[b.channel.id].add_player(b)
 
