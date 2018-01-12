@@ -13,21 +13,26 @@ IMAGE_DIRS = ["bts"]
 postfixes = {}
 COLOR = 0x2956b2
 
+rps_games = {}
+
 
 class RPSPlayer(object):
-    def __init__(self, cpu, mention=""):
+    def __init__(self, cpu, user=discord.User()):
         self.__points = 0
-        self.__mention = mention
+        self.__user = user
+        self.id = user.id
         self.__is_CPU = cpu
         self.__play = None
+        self.__mention = user.mention
 
     def win(self):
         self.__points += 1
 
-    def get_play(self):
+    async def get_play(self):
         # TODO: Change input to discord
         if not self.__is_CPU:
-            self.__play = input(str(self) + ", please pick r, p, or s.")
+            await sendMessage(str(self) + " please pick r, p, or s",self.__user)
+            # self.__play = input(str(self) + ", please pick r, p, or s.")
         elif self.__is_CPU:
             choice = random.choice(["r","p","s"])
             self.__play = choice
@@ -42,23 +47,27 @@ class RPSPlayer(object):
 
 
 class RPSGame(object):
-    def __init__(self, channel):
+    def __init__(self, channel, message):
         self.__channel = channel
         self.__players = []
+        self.users = []
         self.__cpus = 0
-        self.__started = False
+        self.started = False
         self.__games = []
         self.__round_count = 0
+        self.creator = message.author
 
     def add_players(self, players):
         for i in players:
             self.__players.append(RPSPlayer(False,i))
+            self.users.append(i)
 
     def add_cpus(self, num):
         for i in range(num):
             self.__players.append(RPSPlayer(True))
 
-    def start(self):
+    async def start(self):
+        self.started = True
         passing = 0
         players = []
         for i in self.__players:
@@ -68,10 +77,10 @@ class RPSGame(object):
         while passing > 1:
             # TODO:discord
             self.generate_games()
-            print("Current round: %d" % (self.__round_count + 1))
-            self.print_games()
+            await sendMessage("**Round %d**" % (self.__round_count + 1),self.__channel)
+            await self.print_games()
             for i in self.__games:
-                self.do_game(i)
+                await self.do_game(i)
             self.__round_count += 1
             passing = 0
             players = []
@@ -89,17 +98,17 @@ class RPSGame(object):
         for i in range(0, len(list), 2):
             self.__games.append(list[i:i + 2])
 
-    def do_game(self, players):
+    async def do_game(self, players):
         if len(players) == 1:
             players[0].win()
         else:
-            p1 = players[0].get_play()
-            p2 = players[1].get_play()
+            p1 = await players[0].get_play()
+            p2 = await players[1].get_play()
             while p1 == p2:
                 # TODO: discord
                 print("That's a tie! Go again!")
-                p1 = players[0].get_play()
-                p2 = players[1].get_play()
+                p1 = await players[0].get_play()
+                p2 = await players[1].get_play()
             if (p1 == "r" and p2 == "s") or (p1 == "s" and p2 == "p") or (p1 == "p" and p1 == "r"):
                 print(str(players[0]) + " wins!")
                 players[0].win()
@@ -109,15 +118,13 @@ class RPSGame(object):
                 players[1].win()
                 print(str(players[1]) + " points: " + str(players[1].get_points()))
 
-    def print_games(self):
-        print(self.__games)
+    async def print_games(self):
         for i in range(len(self.__games)):
-            print("Game " + str(i + 1))
             try:
                 p2 = str(self.__games[i][1])
             except:
                 p2 = "none"
-            print("%s vs. %s" % (str(self.__games[i][0]),p2))
+            await sendMessage("%s vs. %s" % (str(self.__games[i][0]),p2),self.__channel)
 
     def __str__(self):
         return str(self.__players)
@@ -299,10 +306,8 @@ async def sendMessage(rslt, channel):
             await send(rslt[:1999], channel)
             rslt = rslt[1999:]
         await send(rslt, channel)
-
 async def test(a, b):
     await sendMessage("tested", b.channel)
-
 async def image(a, b):
     await client.send_file(b.channel, a[0] + "/" + random.choice(os.listdir(a[0])))
 async def mhelp(a, b):
@@ -313,16 +318,47 @@ async def rpshelp(a, b):
 async def changepostfix(a,b):
     postfixes[b.server.id] = a[0]
     await sendMessage("Postfix changed to: " + a[0], b.channel)
-
-
-def listToText(list):
-    str = ""
-    for i in range(len(list)):
-        if i != len(list) - 1:
-            str += list[i] + ","
+async def rpscreate(a,b):
+    if b.channel.id in list(rps_games.keys()):
+        await sendMessage("There's already a game in this channel!", b.channel)
+    else:
+        rps_games[b.channel.id] = RPSGame(b.channel,b)
+        await sendMessage("Created a game in channel " + b.channel.name, b.channel)
+async def rpsjoin(a,b):
+    if b.channel.id in list(rps_games.keys()):
+        if not (b.author in rps_games[b.channel.id].users) and not rps_games[b.channel.id].started:
+            rps_games[b.channel.id].add_players([b.author])
+            await sendMessage(b.author.mention + ", you have been added to the game!",b.channel)
+        elif rps_games[b.channel.id].started:
+            await sendMessage("Sorry, but the game in this channel has started without you!")
         else:
-            str += list[i]
-    return list[i]
+            await sendMessage(b.author.mention + ", you are already in the game!", b.channel)
+    else:
+        await sendMessage("There isn't a game in this channel!",b.channel)
+async def rpsstart(a,b):
+    if b.channel.id in list(rps_games.keys()):
+        if len(rps_games[b.channel.id].users) > 1 and rps_games[b.channel.id].creator == b.author:
+            await rps_games[b.channel.id].start()
+            await sendMessage("Started the game!", b.channel)
+        elif rps_games[b.channel.id].creator != b.author:
+            await sendMessage("Only the creator of the game can start the game!", b.channel)
+        else:
+            await sendMessage("Find some friends to play with you! If you don't have any you're out of luck...", b.channel)
+    else:
+        await sendMessage("There isn't a game in this channel!", b.channel)
+async def rpsaddcpus(a,b):
+    run = True
+    if len(a) == 0:
+        num = 1
+    else:
+        if float(a[0]).is_integer() and float(a[0]) > 0:
+            num = int(a[0])
+        else:
+            await sendMessage("Please enter a POSITIVE number",b.channel)
+            run = False
+
+    if run:
+        pass
 
 commands = {
     "test":{
@@ -355,7 +391,25 @@ commands = {
         "run": mvote,
         "params": "[player]",
         "desc": "Vote to kill someone"
+    },
+    "rpscreate": {
+        "run": rpscreate,
+        "desc": "Create a new Rock, Paper, Scissors game in the current channel."
+    },
+    "rpsjoin": {
+        "run": rpsjoin,
+        "desc": "Join the current Rock Paper Scissors game."
+    },
+    "rpsaddcpus": {
+        "run": rpsaddcpus,
+        "params": "[num]",
+        "desc": "Add the specified number of CPU's to the game"
+    },
+    "rpsstart": {
+        "run": rpsstart,
+        "desc": "Stop accepting new players and start the Rock Paper Scissors tournament!"
     }
+
 }
 
 @client.event
@@ -398,7 +452,9 @@ async def on_message(message):
                                                                                        POSTFIX) + " to get help for a specfic command",
                                       color=COLOR)
                 string = ""
-                for i in commands:
+                l = list(commands.keys())
+                l.sort()
+                for i in l:
                     string += i + ", "
                 string = string[:-2]
                 embed.add_field(name="Here are my commands: ", value=string)
@@ -415,5 +471,8 @@ async def on_message(message):
             string = string[:-2]
             embed.add_field(name="Here are my commands: ", value = string)
             await client.send_message(message.channel, embed=embed)
+
+async def on_reaction_add(reaction, user):
+    pass
 
 client.run('MzkwNTgwOTgxMzE0MDkzMDU2.DRN65Q.-6OaVHeudI3zaPeDAjXWTJMw0Zw')
