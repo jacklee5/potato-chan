@@ -138,7 +138,7 @@ class MGameManager(object):
         self.a = a
         self.b = b
         beginning_timeout = asyncio.get_event_loop()
-        beginning_timeout.run_until_complete(self.timeout_start)
+        # beginning_timeout.run_until_complete(self.timeout_start)
         self.leader = b.author
         self.isday = True
         self.time = {
@@ -148,45 +148,71 @@ class MGameManager(object):
         self.force_continue_loop = asyncio.get_event_loop()
         self.not_assigned = []
         self.mafias = 0
+        self.turn_force = asyncio.get_event_loop()
+        self.turn_task = self.turn_force.create_task(self.timeout_restart())
+        self.mafia_playerList = []
+        self.me = b.server.me
 
     async def game_start(self):
         if len(self.playerList) < 4:
             await client.send_message(self.leader, "There are not enough players; there are only " + str(len(self.playerList)))
         else:
+            await sendMessage("Assigning roles!", self.b.channel)
             self.started = True
-            await sendMessage("Assigning roles!")
             for i in range (len(self.playerList)):
                 self.not_assigned.append(i)
             self.mafias = len(self.playerList) - (len(self.playerList) // 2)
             for i in range (self.mafias):
                 mafia_index = random.choice(self.not_assigned)
                 self.playerList[mafia_index].playertype = 'mafia'
+                self.mafia_playerList.append(self.playerList[mafia_index].author)
                 await client.send_message(self.playerList[mafia_index].author, 'You are in the mafia. At night, use "mkill [player]~"')
                 self.not_assigned.remove(mafia_index)
             # doctor and detective
             doctor = random.choice(self.not_assigned)
             self.playerList[doctor].player_type = 'doctor'
             await client.send_message(self.playerList[doctor].author, 'You are the doctor. At night, use "mheal [player]~"')
+            self.doctor = self.playerList[doctor].author
             self.not_assigned.remove(doctor)
             detective = random.choice(self.not_assigned)
             self.playerList[detective].player_type = 'detective'
             await client.send_message(self.playerList[doctor].author, 'You are the detective. At night, use "minspect [player]~"')
+            self.detective = self.playerList[detective].author
             self.not_assigned.remove(detective)
             for i in range (len(self.not_assigned)):
                 self.not_assigned[i].playertype = 'innocent'
                 await client.send_message(self.playerList[i].author, "You are innocent. Don't die!")
             await sendMessage('In the mornings, do "mvote [player]" to vote to lynch someone!', self.b.channel)
-        self.night()
+            self.night()
+
+            nonmafia_perms = discord.PermissionOverwrite(read_messages=False)
+            mafia_perms = discord.PermissionOverwrite(read_messages=True)
+            await client.create_channel(self.b.server, "Mafia", (self.b.server.default_role, nonmafia_perms), self.mafia_playerList, mafia_perms)
+
+            nondoctor_perms = discord.PermissionOverwrite(read_messages=False)
+            doctor_perms = discord.PermissionOverwrite(read_messages=True)
+            await client.create_channel(self.b.server, "Doctor", (self.b.server.default_role, nondoctor_perms), self.doctor, doctor_perms)
+
+            nondetective_perms = discord.PermissionOverwrite(read_messages=False)
+            detective_perms = discord.PermissionOverwrite(read_messages=True)
+            await client.create_channel(self.b.server, "Detective", (self.b.server.default_role, nondetective_perms), self.detective, detective_perms)
 
     async def day(self):
         await sendMessage("Good morning!", self.b.channel)
+        await sendMessage("Time to vote for who to lynch.", self.b.channel)
+        self.votes = []
 
     async def night(self):
         await sendMessage("Good night!", self.b.channel)
-        self.turn_force = asyncio.get_event_loop()
-        self.turn_force.run_until_complete(self.timeout_start)
-        self.isday = False
-        self.turn_force.stop()
+
+    async def change_time(self):
+        self.isday = not self.isday
+        if self.isday:
+            self.day()
+        if not self.isday:
+            self.night()
+        self.turn_task.cancel()
+        await self.turn_task
 
     async def add_player(self, b):
         new_player = MPlayer(b)
@@ -216,6 +242,9 @@ class MGameManager(object):
         asyncio.sleep(10)
         await sendMessage("5 seconds until the " + self.time[self.isday] + " ends!", self.b.channel)
         self.forced_turns += 1
+        if self.forced_turns > 3:
+            await sendMessage("The game has ended due to inactivity!", self.b.channel)
+
 
     async def delete(self):
         await sendMessage("The game has ended due to inactivity!", self.b.channel)
@@ -235,15 +264,18 @@ class MPlayer(object):
         self.channel = player.channel
 
 async def mstart(a, b):
-    if b.channel.id not in mafiagames.keys():
-        mafiagames[b.channel.id] = MGameManager(a, b)
-        await mafiagames[b.channel.id].add_player(b)
+    if b.server.id not in mafiagames.keys():
+        mafiagames[b.server.id] = MGameManager(a, b)
+        await mafiagames[b.server.id].add_player(b)
         await client.send_message(b.author, "Repeat this command if there are 4 or more players to begin!")
-    elif b.author.id == mafiagames[b.channel.id].leader.id:
-        mafiagames[b.channel.id].started = True
-        mafiagames[b.channel.id].game_start()
+    elif b.author.id == mafiagames[b.server.id].leader.id:
+        mafiagames[b.server.id].started = True
+        mafiagames[b.server.id].game_start()
     else:
-        await mafiagames[b.channel.id].add_player(b)
+        await mafiagames[b.server.id].add_player(b)
+
+async def mvote(a, b):
+    print(b.mentions)
 
 # end of mafia
 
@@ -318,6 +350,11 @@ commands = {
         "run": changepostfix,
         "params": "[newpostfix]",
         "desc": "Change the postfix for this bot"
+    },
+    "mvote":{
+        "run": mvote,
+        "params": "[player]",
+        "desc": "Vote to kill someone"
     }
 }
 
