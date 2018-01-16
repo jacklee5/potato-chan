@@ -155,8 +155,6 @@ class MGameManager(object):
         self.force_continue_loop = asyncio.get_event_loop()
         self.not_assigned = []
         self.mafias = 0
-        self.turn_force = asyncio.get_event_loop()
-        self.turn_task = self.turn_force.create_task(self.timeout_restart())
         self.mafia_playerList = []
         self.me = b.server.me
 
@@ -164,6 +162,8 @@ class MGameManager(object):
         if len(self.playerList) < 4:
             await client.send_message(self.leader, "There are not enough players; there are only " + str(len(self.playerList)))
         else:
+            self.turn_force = asyncio.get_event_loop()
+            self.turn_task = self.turn_force.create_task(self.timeout_restart())
             await sendMessage("Assigning roles!", self.b.channel)
             self.started = True
             for i in range (len(self.playerList)):
@@ -190,7 +190,7 @@ class MGameManager(object):
                 self.not_assigned[i].playertype = 'innocent'
                 await client.send_message(self.playerList[i].author, "You are innocent. Don't die!")
             await sendMessage('In the mornings, do "mvote [player]" to vote to lynch someone!', self.b.channel)
-            self.night()
+            await self.night()
 
             nonmafia_perms = discord.PermissionOverwrite(read_messages=False)
             mafia_perms = discord.PermissionOverwrite(read_messages=True)
@@ -240,17 +240,18 @@ class MGameManager(object):
             del self
 
     async def timeout_restart(self):
-        asyncio.sleep(240)
+        await asyncio.sleep(240)
         await sendMessage("60 seconds until the " + self.time[self.isday] + " ends!", self.b.channel)
-        asyncio.sleep(30)
+        await asyncio.sleep(30)
         await sendMessage("30 seconds until the " + self.time[self.isday] + " ends!", self.b.channel)
-        asyncio.sleep(15)
+        await asyncio.sleep(15)
         await sendMessage("15 seconds until the " + self.time[self.isday] + " ends!", self.b.channel)
-        asyncio.sleep(10)
+        await asyncio.sleep(10)
         await sendMessage("5 seconds until the " + self.time[self.isday] + " ends!", self.b.channel)
         self.forced_turns += 1
         if self.forced_turns > 3:
             await sendMessage("The game has ended due to inactivity!", self.b.channel)
+        self.change_time()
 
 
     async def delete(self):
@@ -277,7 +278,7 @@ async def mstart(a, b):
         await client.send_message(b.author, "Repeat this command if there are 4 or more players to begin!")
     elif b.author.id == mafiagames[b.server.id].leader.id:
         mafiagames[b.server.id].started = True
-        mafiagames[b.server.id].game_start()
+        await mafiagames[b.server.id].game_start()
     else:
         await mafiagames[b.server.id].add_player(b)
 
