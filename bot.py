@@ -14,6 +14,7 @@ postfixes = {}
 COLOR = 0x2956b2
 
 rps_games = {}
+rps_dms = {}
 
 
 class RPSPlayer(object):
@@ -21,34 +22,37 @@ class RPSPlayer(object):
         self.__points = 0
         self.__user = user
         self.id = user.id
-        self.__is_CPU = cpu
+        self.is_CPU = cpu
         self.__play = None
         self.__mention = user.mention
 
     def win(self):
         self.__points += 1
 
-    async def get_play(self):
+    async def get_reaction_message(self):
         # TODO: Change input to discord
-        if not self.__is_CPU:
-            await sendMessage(str(self) + " please pick r, p, or s",self.__user)
+        if not self.is_CPU:
+            message = await client.send_message(self.__user, str(self) + " please react with your choice!")
+            await client.add_reaction(message, "💎")
+            await client.add_reaction(message, "📜")
+            await client.add_reaction(message, "✂")
+            return message.id
             # self.__play = input(str(self) + ", please pick r, p, or s.")
-        elif self.__is_CPU:
+        elif self.is_CPU:
             choice = random.choice(["r","p","s"])
             self.__play = choice
             print("A CPU picked " + choice)
-        return self.__play
 
     def get_points(self):
         return self.__points
 
     def __str__(self):
-        return ("CPU" if self.__is_CPU else ("Player " + self.__mention))
+        return ("CPU" if self.is_CPU else ("Player " + self.__mention))
 
 
 class RPSGame(object):
     def __init__(self, channel, message):
-        self.__channel = channel
+        self.channel = channel
         self.__players = []
         self.users = []
         self.__cpus = 0
@@ -56,6 +60,7 @@ class RPSGame(object):
         self.__games = []
         self.__round_count = 0
         self.creator = message.author
+        self.reaction_data = {}
 
     def add_players(self, players):
         for i in players:
@@ -77,7 +82,7 @@ class RPSGame(object):
         while passing > 1:
             # TODO:discord
             self.generate_games()
-            await sendMessage("**Round %d**" % (self.__round_count + 1),self.__channel)
+            await sendMessage("**Round %d**" % (self.__round_count + 1),self.channel)
             await self.print_games()
             for i in self.__games:
                 await self.do_game(i)
@@ -102,21 +107,33 @@ class RPSGame(object):
         if len(players) == 1:
             players[0].win()
         else:
-            p1 = await players[0].get_play()
-            p2 = await players[1].get_play()
-            while p1 == p2:
-                # TODO: discord
-                print("That's a tie! Go again!")
-                p1 = await players[0].get_play()
-                p2 = await players[1].get_play()
-            if (p1 == "r" and p2 == "s") or (p1 == "s" and p2 == "p") or (p1 == "p" and p1 == "r"):
-                print(str(players[0]) + " wins!")
-                players[0].win()
-                print(str(players[0]) + " points: " + str(players[0].get_points()))
+            players[0].get_reaction_message()
+            players[1].get_reaction_message()
+            if not players[0].is_CPU:
+                rps_games[players[0].get_reaction_message()] = {"player":players[0],"game":self}
             else:
-                print(str(players[1]) + " wins!")
-                players[1].win()
-                print(str(players[1]) + " points: " + str(players[1].get_points()))
+                players[0].get_reaction_message()
+            if not players[1].is_CPU:
+                rps_games[players[1].get_reaction_message()] = {"player":players[1],"game":self}
+            else:
+                players[1].get_reaction_message()
+            # await players[0].get_play()
+            # await players[1].get_play()
+            # p1 = await players[0].get_play()
+            # p2 = await players[1].get_play()
+            # while p1 == p2:
+            #     # TODO: discord
+            #     print("That's a tie! Go again!")
+            #     p1 = await players[0].get_play()
+            #     p2 = await players[1].get_play()
+            # if (p1 == "r" and p2 == "s") or (p1 == "s" and p2 == "p") or (p1 == "p" and p1 == "r"):
+            #     print(str(players[0]) + " wins!")
+            #     players[0].win()
+            #     print(str(players[0]) + " points: " + str(players[0].get_points()))
+            # else:
+            #     print(str(players[1]) + " wins!")
+            #     players[1].win()
+            #     print(str(players[1]) + " points: " + str(players[1].get_points()))
 
     async def print_games(self):
         for i in range(len(self.__games)):
@@ -124,7 +141,7 @@ class RPSGame(object):
                 p2 = str(self.__games[i][1])
             except:
                 p2 = "none"
-            await sendMessage("%s vs. %s" % (str(self.__games[i][0]),p2),self.__channel)
+            await sendMessage("%s vs. %s" % (str(self.__games[i][0]),p2),self.channel)
 
     def __str__(self):
         return str(self.__players)
@@ -474,6 +491,7 @@ async def on_message(message):
             await client.send_message(message.channel, embed=embed)
 
 async def on_reaction_add(reaction, user):
-    pass
+    if reaction.message.id in list(rps_dms.keys()):
+        sendMessage(reaction.emoji + " by " + rps_dms[reaction.message.id]["player"].name,rps_dms[reaction.message.id]["game"].channel)
 
 client.run('MzkwNTgwOTgxMzE0MDkzMDU2.DRN65Q.-6OaVHeudI3zaPeDAjXWTJMw0Zw')
