@@ -170,7 +170,6 @@ class MGameManager(object):
             False: "night"
         }
         self.force_continue_loop = asyncio.get_event_loop()
-        self.not_assigned = []
         self.mafias = 0
         self.mafia_playerList = []
         self.me = b.server.me
@@ -183,43 +182,36 @@ class MGameManager(object):
             self.turn_task = self.turn_force.create_task(self.timeout_restart())
             await sendMessage("Assigning roles!", self.b.channel)
             self.started = True
+
+            random.shuffle(self.playerList)
+
+            for i in range (len(self.playerList)//2 + 1):
+                self.playerList[i].player_type = "mafia"
+
+            self.playerList[len(self.playerList)//2 + 2].player_type = "doctor"
+
+            self.playerList[len(self.playerList)//2 + 3].player_type = "detective"
+
+            for i in range (len(self.playerList) - (len(self.playerList)//2 + 3)):
+                self.playerList[i + (len(self.playerList)//2 + 4)].player_type = "innocent"
+
             for i in range (len(self.playerList)):
-                self.not_assigned.append(i)
-            self.mafias = len(self.playerList) - (len(self.playerList) // 2)
-            for i in range (self.mafias):
-                mafia_index = random.choice(self.not_assigned)
-                self.playerList[mafia_index].playertype = 'mafia'
-                self.mafia_playerList.append(self.playerList[mafia_index].author)
-                await client.send_message(self.playerList[mafia_index].author, 'You are in the mafia. At night, use "mkill [player]~"')
-                self.not_assigned.remove(mafia_index)
-            # doctor and detective
-            doctor = random.choice(self.not_assigned)
-            self.playerList[doctor].player_type = 'doctor'
-            await client.send_message(self.playerList[doctor].author, 'You are the doctor. At night, use "mheal [player]~"')
-            self.doctor = self.playerList[doctor].author
-            self.not_assigned.remove(doctor)
-            detective = random.choice(self.not_assigned)
-            self.playerList[detective].player_type = 'detective'
-            await client.send_message(self.playerList[doctor].author, 'You are the detective. At night, use "minspect [player]~"')
-            self.detective = self.playerList[detective].author
-            self.not_assigned.remove(detective)
-            for i in range (len(self.not_assigned)):
-                self.not_assigned[i].playertype = 'innocent'
-                await client.send_message(self.playerList[i].author, "You are innocent. Don't die!")
+                print(self.playerList[i].player_type)
+
             await sendMessage('In the mornings, do "mvote [player]" to vote to lynch someone!', self.b.channel)
             await self.night()
 
             nonmafia_perms = discord.PermissionOverwrite(read_messages=False)
             mafia_perms = discord.PermissionOverwrite(read_messages=True)
-            await client.create_channel(self.b.server, "Mafia", (self.b.server.default_role, nonmafia_perms), self.mafia_playerList, mafia_perms)
+            await client.create_channel(self.b.server, "Mafia", (self.b.server.default_role, nonmafia_perms), self.b.server.me, mafia_perms)
 
             nondoctor_perms = discord.PermissionOverwrite(read_messages=False)
             doctor_perms = discord.PermissionOverwrite(read_messages=True)
-            await client.create_channel(self.b.server, "Doctor", (self.b.server.default_role, nondoctor_perms), self.doctor, doctor_perms)
+            await client.create_channel(self.b.server, "Doctor", (self.b.server.default_role, nondoctor_perms), self.b.server.me, doctor_perms)
 
             nondetective_perms = discord.PermissionOverwrite(read_messages=False)
             detective_perms = discord.PermissionOverwrite(read_messages=True)
-            await client.create_channel(self.b.server, "Detective", (self.b.server.default_role, nondetective_perms), self.detective, detective_perms)
+            await client.create_channel(self.b.server, "Detective", (self.b.server.default_role, nondetective_perms), self.b.server.me, detective_perms)
 
     async def day(self):
         await sendMessage("Good morning!", self.b.channel)
