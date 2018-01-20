@@ -184,34 +184,52 @@ class MGameManager(object):
             self.started = True
 
             random.shuffle(self.playerList)
+            mafiafirst = True
 
-            for i in range (len(self.playerList)//2 + 1):
+            for i in range (len(self.playerList)//2):
                 self.playerList[i].player_type = "mafia"
+                print(self.playerList[i].player_type)
+                self.mafia_playerList.append(self.playerList[i])
+                if mafiafirst:
+                    nonmafia_perms = discord.PermissionOverwrite(read_messages=False)
+                    mafia_perms = discord.PermissionOverwrite(read_messages=True)
+                    await client.create_channel(self.b.server, "mafia", (self.b.server.default_role, nonmafia_perms), (self.mafia_playerList[0].author, mafia_perms))
+                    self.mafiachannel = discord.utils.find(lambda c: c.name == 'mafia', self.b.server.channels)
+                    mafiafirst = False
+                else:
+                    overwrite = discord.PermissionOverwrite()
+                    overwrite.read_messages = True
+                    await client.edit_channel_permissions(self.mafiachannel, self.playerList[i].author, overwrite)
 
-            self.playerList[len(self.playerList)//2 + 2].player_type = "doctor"
+            await sendMessage("You are mafia!", self.mafiachannel)
+            self.playerList[len(self.playerList)//2].player_type = "doctor"
+            print(self.playerList[len(self.playerList)//2].player_type)
+            self.doctor = self.playerList[len(self.playerList)//2].author
 
-            self.playerList[len(self.playerList)//2 + 3].player_type = "detective"
-
-            for i in range (len(self.playerList) - (len(self.playerList)//2 + 3)):
-                self.playerList[i + (len(self.playerList)//2 + 4)].player_type = "innocent"
+            self.playerList[len(self.playerList)//2 + 1].player_type = "detective"
+            print(self.playerList[len(self.playerList)//2 + 1].player_type)
+            self.detective = self.playerList[len(self.playerList)//2 + 1].author
 
             for i in range (len(self.playerList)):
-                print(self.playerList[i].player_type)
+                if self.playerList[i].player_type not in ["mafia", "doctor", "detective"]:
+                    self.playerList[i].player_type = "innocent"
 
+            await sendMessage('Whoever was not added to a channel is innocent.', self.b.channel)
             await sendMessage('In the mornings, do "mvote [player]" to vote to lynch someone!', self.b.channel)
             await self.night()
 
-            nonmafia_perms = discord.PermissionOverwrite(read_messages=False)
-            mafia_perms = discord.PermissionOverwrite(read_messages=True)
-            await client.create_channel(self.b.server, "Mafia", (self.b.server.default_role, nonmafia_perms), self.b.server.me, mafia_perms)
-
             nondoctor_perms = discord.PermissionOverwrite(read_messages=False)
             doctor_perms = discord.PermissionOverwrite(read_messages=True)
-            await client.create_channel(self.b.server, "Doctor", (self.b.server.default_role, nondoctor_perms), self.b.server.me, doctor_perms)
+            await client.create_channel(self.b.server, "doctor", (self.b.server.default_role, nondoctor_perms), (self.doctor, doctor_perms))
+            self.doctorchannel = discord.utils.find(lambda c: c.name == 'doctor', self.b.server.channels)
+            await sendMessage("You are the doctor!", self.doctorchannel)
 
             nondetective_perms = discord.PermissionOverwrite(read_messages=False)
             detective_perms = discord.PermissionOverwrite(read_messages=True)
-            await client.create_channel(self.b.server, "Detective", (self.b.server.default_role, nondetective_perms), self.b.server.me, detective_perms)
+            await client.create_channel(self.b.server, "detective", (self.b.server.default_role, nondetective_perms), (self.detective, detective_perms))
+            self.detectivechannel = discord.utils.find(lambda c: c.name == 'detective', self.b.server.channels)
+            await sendMessage("You are the detective!", self.detectivechannel)
+
 
     async def day(self):
         await sendMessage("Good morning!", self.b.channel)
