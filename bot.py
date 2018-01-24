@@ -137,10 +137,11 @@ class MGameManager(object):
         self.forced_turns = 0
         self.a = a
         self.b = b
+        self.dones = 0
         beginning_timeout = asyncio.get_event_loop()
         # beginning_timeout.run_until_complete(self.timeout_start)
         self.leader = b.author
-        self.isday = True
+        self.isday = False
         self.time = {
             True: "day",
             False: "night"
@@ -149,6 +150,16 @@ class MGameManager(object):
         self.mafias = 0
         self.mafia_playerList = []
         self.me = b.server.me
+        self.healdone = False
+        self.killdone = False
+        self.votedone = False
+        self.detectdone = False
+        self.dayvotes = []
+        for i in range(len(self.playerList)):
+            self.dayvotes.append("")
+        self.nightvotes = []
+        for i in range (len(self.mafia_playerList)):
+            self.nightvotes.append("")
 
     async def game_start(self):
         if len(self.playerList) < 4:
@@ -169,15 +180,19 @@ class MGameManager(object):
                 if mafiafirst:
                     nonmafia_perms = discord.PermissionOverwrite(read_messages=False)
                     mafia_perms = discord.PermissionOverwrite(read_messages=True)
-                    await client.create_channel(self.b.server, "mafia", (self.b.server.default_role, nonmafia_perms), (self.mafia_playerList[0].author, mafia_perms))
-                    self.mafiachannel = discord.utils.find(lambda c: c.name == 'mafia', self.b.server.channels)
+                    self.mafiachannel = await client.create_channel(self.b.server, "mafia", (self.b.server.default_role, nonmafia_perms), (self.mafia_playerList[0].author, mafia_perms))
+                    # self.mafiachannel = discord.utils.find(lambda c: c.name == 'mafia', self.b.server.channels)
                     mafiafirst = False
+
                 else:
                     overwrite = discord.PermissionOverwrite()
                     overwrite.read_messages = True
                     await client.edit_channel_permissions(self.mafiachannel, self.playerList[i].author, overwrite)
 
             await sendMessage("You are mafia!", self.mafiachannel)
+            for i in range(len(self.mafia_playerList)):
+                await sendMessage(self.mafia_playerList[i].author.mention, self.mafiachannel)
+
             self.playerList[len(self.playerList)//2].player_type = "doctor"
             print(self.playerList[len(self.playerList)//2].player_type)
             self.doctor = self.playerList[len(self.playerList)//2].author
@@ -192,31 +207,55 @@ class MGameManager(object):
 
             await sendMessage('Whoever was not added to a channel is innocent.', self.b.channel)
             await sendMessage('In the mornings, do "mvote [player]" to vote to lynch someone!', self.b.channel)
-            await self.night()
 
             nondoctor_perms = discord.PermissionOverwrite(read_messages=False)
             doctor_perms = discord.PermissionOverwrite(read_messages=True)
-            await client.create_channel(self.b.server, "doctor", (self.b.server.default_role, nondoctor_perms), (self.doctor, doctor_perms))
-            self.doctorchannel = discord.utils.find(lambda c: c.name == 'doctor', self.b.server.channels)
-            await sendMessage("You are the doctor!", self.doctorchannel)
+            self.doctorchannel = await client.create_channel(self.b.server, "doctor", (self.b.server.default_role, nondoctor_perms), (self.doctor, doctor_perms))
+            await sendMessage("You are the doctor, " + self.doctor.mention + "!", self.doctorchannel)
 
             nondetective_perms = discord.PermissionOverwrite(read_messages=False)
             detective_perms = discord.PermissionOverwrite(read_messages=True)
-            await client.create_channel(self.b.server, "detective", (self.b.server.default_role, nondetective_perms), (self.detective, detective_perms))
-            self.detectivechannel = discord.utils.find(lambda c: c.name == 'detective', self.b.server.channels)
-            await sendMessage("You are the detective!", self.detectivechannel)
+            self.detectivechannel = await client.create_channel(self.b.server, "detective", (self.b.server.default_role, nondetective_perms), (self.detective, detective_perms))
+            await sendMessage("You are the detective, " + self.detective.mention + "!", self.detectivechannel)
+
+            self.playerids = []
+            for i in range (len(self.playerList)):
+                self.playerids.append(self.playerList[i].author.id)
+            await self.night()
 
 
     async def day(self):
         await sendMessage("Good morning!", self.b.channel)
         await sendMessage("Time to vote for who to lynch.", self.b.channel)
-        self.votes = []
 
     async def night(self):
         await sendMessage("Good night!", self.b.channel)
 
     async def change_time(self):
+        if not self.isday:
+            for i in range(len(self.playerList)):
+                if self.playerList[i].will_kill and self.playerList[i].willheal:
+                    await sendMessage(self.playerList[i].author.mention + " was killed, but healed!", self.b.channel)
+                elif self.playerList[i].will_kill:
+                    await sendMessage(self.playerList[i].author.mention + " was killed!", self.b.channel)
+                    self.playerList[i].isdead = True
+        mafias = 0
+        innocents = 0
+        for i in range(len(self.playerList)):
+            if self.playerList[i].player_type == "mafia":
+                mafias += 1
+            else:
+                innocents += 1
+        if mafias == 0:
+            await sendMessage("The innocents win!", self.b.channel)
+            await client.delete_channel(self.mafiachannel)
+            await client.delete_channel(self.detectivechannel)
+            await client.delete_channel(self.doctorchannel)
+        elif innocents == 1:
+            await sendMessage("The mafia wins!", self.b.channel)
         self.isday = not self.isday
+        for i in range(len(self.playerList)):
+            self.playerList[i].reset()
         if self.isday:
             self.day()
         if not self.isday:
@@ -261,6 +300,120 @@ class MGameManager(object):
         await sendMessage("The game has ended due to inactivity!", self.b.channel)
         del self
 
+    async def vote(self, b):
+        if b.author.id not in self.playerids:
+            await sendMessage("You are not in a game!", b.channel)
+        elif self.isday:
+            for i in range (len(self.playerids)):
+                if b.author.id == self.playerList[i].author.id:
+                    voter = self.playerList[i]
+            if voter.hasvoted:
+                await sendMessage("You have voted already!", b.channel)
+            else:
+                for i in range (len(self.playerList)):
+                    if b.mentions[0].id == self.playerList[i].author.id:
+                        self.dayvotes.append(i)
+                        if len(self.dayvotes) == len(self.playerList):
+                            await self.lynch()
+        elif not self.isday:
+            for i in range (len(self.mafia_playerList)):
+                if b.author.id == self.mafia_playerList[i].author.id:
+                    voter = self.mafia_playerList[i]
+            if voter.hasvoted:
+                await sendMessage("You have voted already!", b.channel)
+            else:
+                for i in range (len(self.playerList)):
+                    if b.mentions[0].id == self.playerList[i].author.id:
+                        self.nightvotes.append(i)
+                        if len(self.nightvotes) == len(self.playerList) - len(self.mafia_playerList):
+                            await self.mafiakill()
+
+    async def lynch(self):
+        votelist = []
+        for i in range(len(self.playerList)):
+            votelist.append(0)
+        for i in range(len(self.dayvotes)):
+            votelist[self.dayvotes[i]] = votelist[self.dayvotes[i]] + 1
+        maximum = max(votelist)
+        for i in range(len(self.playerList)):
+            if votelist[i] == maximum and not self.votedone:
+                self.votedone = True
+                self.playerList[votelist[i]].isdead = True
+                await sendMessage(self.playerList[votelist[i]].author.mention + " was killed!", self.b.channel)
+                self.change_time()
+
+    async def mafiakill(self):
+        votelist = []
+        for i in range(len(self.playerList)):
+            votelist.append(0)
+        for i in range(len(self.nightvotes)):
+            votelist[self.nightvotes[i]] = votelist[self.nightvotes[i]] + 1
+        maximum = max(votelist)
+        for i in range(len(self.playerList)):
+            if votelist[i] == maximum and not self.votedone:
+                self.votedone = True
+                self.playerList[votelist[i]].willkill = True
+                await self.endnight()
+
+    async def endnight(self):
+        self.dones += 1
+        if self.dones == 3:
+            self.dones = 0
+            self.change_time()
+
+    async def heal(self, b):
+        isdoctor = False
+        toheal = None
+        for i in range (len(self.playerids)):
+            if self.playerids[i] == b.author.id:
+                if self.playerList[i].player_type == "doctor":
+                    isdoctor = True
+        for i in range (len(self.playerids)):
+            if self.playerids[i] == b.mentions[0].id:
+                toheal = self.playerList[i]
+
+        if b.author.id not in self.playerids:
+            await sendMessage("You are not in a game!", b.channel)
+        elif self.isday:
+            await sendMessage("It is not the time to heal.", b.channel)
+        elif not isdoctor:
+            await sendMessage("You are not the doctor!", b.channel)
+        elif self.healdone:
+            await sendMessage("You already healed someone tonight!", b.channel)
+        elif toheal.is_dead:
+            await sendMessage("This person is dead...", b.channel)
+        else:
+            toheal.willheal = True
+            await sendMessage("You healed " + toheal.author.display_name + ".", b.channel)
+            self.healdone = True
+
+    async def detect(self, b):
+        isdetective = False
+        todetect = None
+        for i in range (len(self.playerids)):
+            if self.playerids[i] == b.author.id:
+                if self.playerList[i].player_type == "detective":
+                    isdetective = True
+        for i in range (len(self.playerids)):
+            if self.playerids[i] == b.mentions[0].id:
+                todetect = self.playerList[i]
+        if b.author.id not in self.playerids:
+            await sendMessage("You are not in a game!", b.channel)
+        elif self.isday:
+            await sendMessage("It is not the time to detect.", b.channel)
+        elif not isdetective:
+            await sendMessage("You are not the detective!", b.channel)
+        elif self.detectdone:
+            await sendMessage("You already detected someone tonight!", b.channel)
+        elif todetect.is_dead:
+            await sendMessage("This person is dead...", b.channel)
+        else:
+            if todetect.player_type == "mafia":
+                what = "in the mafia."
+            else:
+                what = "is not in the mafia."
+            await sendMessage(todetect.author.display_name + " is " + what, b.channel)
+            self.detectdone = True
 
 class MPlayer(object):
     def __init__(self, player):
@@ -273,6 +426,14 @@ class MPlayer(object):
         self.id = player.author.id
         self.author = player.author
         self.channel = player.channel
+        self.hasvoted = False
+
+    def reset(self):
+        self.will_kill = False
+        self.will_heal = False
+        self.is_done = False
+        self.hasvoted = False
+
 
 async def mstart(a, b):
     if b.server.id not in mafiagames.keys():
@@ -285,8 +446,23 @@ async def mstart(a, b):
     else:
         await mafiagames[b.server.id].add_player(b)
 
-async def mvote(a, b):
-    print(b.mentions)
+async def mvote (a, b):
+    if b.server.id not in mafiagames.keys():
+        await sendMessage('There are no mafia games in this server. Type "mstart~" to start one.', b.channel)
+    else:
+        await mafiagames[b.server.id].vote(b)
+
+async def mdetect (a, b):
+    if b.server.id not in mafiagames.keys():
+        await sendMessage('There are no mafia games in this server. Type "mstart~" to start one.', b.channel)
+    else:
+        await mafiagames[b.server.id].detect(b)
+
+async def mheal (a, b):
+    if b.server.id not in mafiagames.keys():
+        await sendMessage('There are no mafia games in this server. Type "mstart~" to start one.', b.channel)
+    else:
+        await mafiagames[b.server.id].heal(b)
 
 # end of mafia
 
@@ -312,6 +488,10 @@ async def sendMessage(rslt, channel):
         await send(rslt, channel)
 async def test(a, b):
     await sendMessage("tested", b.channel)
+    testa = a
+    testb = b
+    print(str(a) + str(b))
+
 async def image(a, b):
     await client.send_file(b.channel, a[0] + "/" + random.choice(os.listdir(a[0])))
 async def mhelp(a, b):
@@ -390,15 +570,25 @@ commands = {
         "run": mstart,
         "desc": "Creates a mafia game and if there is one, adds you."
     },
+    "mvote":{
+        "run": mvote,
+        "params": "[player]",
+        "desc": "If it is the day, you vote for who to lynch. If it's the night and you are in the mafia, you can vote for who to kill!"
+    },
+    "mheal":{
+        "run": mheal,
+        "desc": "If it is the night, a doctor can choose to save someone from being killed from the mafia!",
+        "params": "[player]",
+    },
+    "mdetect":{
+        "run": mdetect,
+        "desc": "If it is the night, a detective can check if an alive person is a part of the mafia or innocent!",
+        "params": "[player]",
+    },
     "changepostfix":{
         "run": changepostfix,
         "params": "[newpostfix]",
         "desc": "Change the postfix for this bot"
-    },
-    "mvote":{
-        "run": mvote,
-        "params": "[player]",
-        "desc": "Vote to kill someone"
     },
     "rpscreate": {
         "run": rpscreate,
