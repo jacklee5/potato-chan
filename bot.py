@@ -4,6 +4,7 @@ import os
 import threading
 import random
 import copy
+import time
 
 client = discord.Client()
 
@@ -290,6 +291,15 @@ async def mvote(a, b):
 
 # end of mafia
 
+
+class Player(object):
+    def __init__(self, user):
+        self.user = user
+        self.pounds = 0
+        self.lastDaily = None
+        self.name = user.name
+
+
 def getCommand(message):
     things = message[:-1].lower().split()
     command = {
@@ -297,6 +307,12 @@ def getCommand(message):
         "params": things[1:]
     }
     return command
+def getAccount(user):
+    if user.id in list(user_data.keys()):
+        return user_data[user.id]
+    else:
+        user_data[user.id] = Player(user)
+        return user_data[user.id]
 
 async def send(text, channel):
     await client.send_typing(channel)
@@ -367,6 +383,22 @@ async def rpsaddcpus(a,b):
             await sendMessage("Added %d CPU's to this game!" % (num), b.channel)
         else:
             await sendMessage("There isn't a game in this channel!", b.channel)
+async def daily(a,b):
+    account = getAccount(b.author)
+    if account.lastDaily == None or time.time() - account.lastDaily > 86400:
+        await sendMessage("Collected daily!", b.channel)
+        account.pounds += 10
+        account.lastDaily = time.time()
+    else:
+        secondsSince = time.time() - account.lastDaily
+        await sendMessage("Already collected today! You can collect again in %d hours and %d minutes" % (24 - secondsSince/3600, (60 - (secondsSince % 3600)/60)), b.channel)
+async def profile(a,b):
+    if len(a) == 0:
+        account = getAccount(b.author)
+    else:
+        account = getAccount(b.mentions[0])
+    await sendMessage("**Profile for %s**\n**Potato Pounds: ** %d" % (account.name, account.pounds), b.channel)
+
 
 commands = {
     "test":{
@@ -416,8 +448,16 @@ commands = {
     "rpsstart": {
         "run": rpsstart,
         "desc": "Stop accepting new players and start the Rock Paper Scissors tournament!"
+    },
+    "daily": {
+        "run": daily,
+        "desc":"Get your daily sum of PotatoPounds"
+    },
+    "profile": {
+        "run": profile,
+        "params": "(user)",
+        "desc": "Get profile information about yourself, or a specified user."
     }
-
 }
 
 @client.event
@@ -578,7 +618,8 @@ async def on_reaction_add(reaction, user):
                         for i in game.games:
                             await game.do_game(i)
                     else:
-                        await sendMessage("The game has ended! The winner is %s" % (str(game.players[0])), game.channel)
+                        await sendMessage("The game has ended! The winner is %s. Have 10 PotatoPounds as a reward!" % (str(game.players[0])), game.channel)
+                        getAccount(game.players[0].user).pounds += 10
                         for i in game.players:
                             print("Points for %s is %d" % (str(i),i.get_points()))
                         del rps_games[game.channel.id]
