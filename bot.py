@@ -155,6 +155,15 @@ class MGameManager(object):
         self.votedone = False
         self.detectdone = False
         self.votes = 0
+        self.mafiateam = []
+        self.innocentteam = []
+        for i in range (len(self.mafia_playerList)):
+            self.mafiateam.append(self.mafia_playerList[i].author)
+        for i in range (len(self.playerList)):
+            self.innocentteam.append(self.playerList[i].author)
+        for i in range (len(self.mafiateam)):
+            if self.mafiateam[i] in self.innocentteam:
+                self.innocentteam.remove(self.mafiateam[i])
 
     async def game_start(self):
         if len(self.playerList) < 4:
@@ -184,7 +193,7 @@ class MGameManager(object):
                     overwrite.read_messages = True
                     await client.edit_channel_permissions(self.mafiachannel, self.playerList[i].author, overwrite)
 
-            await sendMessage("You are mafia!", self.mafiachannel)
+            await sendMessage('You are mafia!\nUse "mvote [player]~" to vote and kill someone.', self.mafiachannel)
             for i in range(len(self.mafia_playerList)):
                 await sendMessage(self.mafia_playerList[i].author.mention, self.mafiachannel)
 
@@ -206,12 +215,12 @@ class MGameManager(object):
             nondoctor_perms = discord.PermissionOverwrite(read_messages=False)
             doctor_perms = discord.PermissionOverwrite(read_messages=True)
             self.doctorchannel = await client.create_channel(self.b.server, "doctor", (self.b.server.default_role, nondoctor_perms), (self.doctor, doctor_perms))
-            await sendMessage("You are the doctor, " + self.doctor.mention + "!", self.doctorchannel)
+            await sendMessage("You are the doctor, " + self.doctor.mention + '!\nUse "mheal [player]~" to heal someone!', self.doctorchannel)
 
             nondetective_perms = discord.PermissionOverwrite(read_messages=False)
             detective_perms = discord.PermissionOverwrite(read_messages=True)
             self.detectivechannel = await client.create_channel(self.b.server, "detective", (self.b.server.default_role, nondetective_perms), (self.detective, detective_perms))
-            await sendMessage("You are the detective, " + self.detective.mention + "!", self.detectivechannel)
+            await sendMessage("You are the detective, " + self.detective.mention + '!\n Use "mdetect [player]~" to check if someone is in the mafia.', self.detectivechannel)
 
             self.playerids = []
             for i in range (len(self.playerList)):
@@ -252,13 +261,17 @@ class MGameManager(object):
             else:
                 innocents += 1
         if mafias == 0:
-            await sendMessage("The innocents win!", self.b.channel)
+            await sendMessage("The innocents win! You get 20 PotatoPounds.", self.b.channel)
+            for i in range (len(self.innocentteam)):
+                getAccount(self.innocentteam[i]).pounds += 20
             await client.delete_channel(self.mafiachannel)
             await client.delete_channel(self.detectivechannel)
             await client.delete_channel(self.doctorchannel)
             win = True
         elif innocents == 1:
-            await sendMessage("The mafia wins!", self.b.channel)
+            await sendMessage("The mafia wins! You get 20 PotatoPounds.", self.b.channel)
+            for i in range (len(self.mafiateam)):
+                getAccount(self.mafiateam[i]).pounds += 20
             await client.delete_channel(self.mafiachannel)
             await client.delete_channel(self.detectivechannel)
             await client.delete_channel(self.doctorchannel)
