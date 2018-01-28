@@ -1,7 +1,6 @@
 import discord
 import asyncio
 import os
-import threading
 import random
 import copy
 
@@ -9,7 +8,7 @@ client = discord.Client()
 
 TYPING_SPEED = 0.25
 POSTFIX = "~"
-IMAGE_DIRS = ["bts"]
+IMAGE_DIRS = ["bts", "anime"]
 postfixes = {}
 COLOR = 0x2956b2
 
@@ -154,12 +153,7 @@ class MGameManager(object):
         self.killdone = False
         self.votedone = False
         self.detectdone = False
-        self.dayvotes = []
-        for i in range(len(self.playerList)):
-            self.dayvotes.append("")
-        self.nightvotes = []
-        for i in range (len(self.mafia_playerList)):
-            self.nightvotes.append("")
+        self.votes = 0
 
     async def game_start(self):
         if len(self.playerList) < 4:
@@ -232,15 +226,25 @@ class MGameManager(object):
         await sendMessage("Good night!", self.b.channel)
 
     async def change_time(self):
+        self.votedone = False
         if not self.isday:
+            print("doing mafia kill")
             for i in range(len(self.playerList)):
-                if self.playerList[i].will_kill and self.playerList[i].willheal:
+                if self.playerList[i].will_kill == True and self.playerList[i].will_heal == True:
                     await sendMessage(self.playerList[i].author.mention + " was killed, but healed!", self.b.channel)
+                    print('await sendMessage(self.playerList[i].author.mention + " was killed, but healed!", self.b.channel)')
                 elif self.playerList[i].will_kill:
                     await sendMessage(self.playerList[i].author.mention + " was killed!", self.b.channel)
                     self.playerList[i].isdead = True
+                    self.playerids.remove(self.playerList[i].id)
+                    if self.playerList[i] in self.mafia_playerList:
+                        self.mafia_playerList.remove(self.playerList[i])
+                    self.playerList.remove(self.playerList[i])
+                    print('await sendMessage(self.playerList[i].author.mention + " was killed!", self.b.channel)')
+                    break
         mafias = 0
         innocents = 0
+        win = False
         for i in range(len(self.playerList)):
             if self.playerList[i].player_type == "mafia":
                 mafias += 1
@@ -251,17 +255,25 @@ class MGameManager(object):
             await client.delete_channel(self.mafiachannel)
             await client.delete_channel(self.detectivechannel)
             await client.delete_channel(self.doctorchannel)
+            win = True
         elif innocents == 1:
             await sendMessage("The mafia wins!", self.b.channel)
-        self.isday = not self.isday
-        for i in range(len(self.playerList)):
-            self.playerList[i].reset()
-        if self.isday:
-            self.day()
-        if not self.isday:
-            self.night()
-        self.turn_task.cancel()
-        await self.turn_task
+            await client.delete_channel(self.mafiachannel)
+            await client.delete_channel(self.detectivechannel)
+            await client.delete_channel(self.doctorchannel)
+            win = True
+        if not win:
+            self.isday = not self.isday
+            for i in range(len(self.playerList)):
+                self.playerList[i].reset()
+            if self.isday:
+                await self.day()
+            if not self.isday:
+                await self.night()
+            self.turn_task.cancel()
+            await self.turn_task
+        else:
+            del mafiagames[self.b.server.id]
 
     async def add_player(self, b):
         new_player = MPlayer(b)
@@ -293,7 +305,7 @@ class MGameManager(object):
         self.forced_turns += 1
         if self.forced_turns > 3:
             await sendMessage("The game has ended due to inactivity!", self.b.channel)
-        self.change_time()
+            await self.change_time()
 
 
     async def delete(self):
@@ -310,56 +322,69 @@ class MGameManager(object):
             if voter.hasvoted:
                 await sendMessage("You have voted already!", b.channel)
             else:
-                for i in range (len(self.playerList)):
+                for i in range(len(self.playerList)):
                     if b.mentions[0].id == self.playerList[i].author.id:
-                        self.dayvotes.append(i)
-                        if len(self.dayvotes) == len(self.playerList):
+                        self.playerList[i].votes += 1
+                        self.votes += 1
+                        if self.votes == len(self.playerList):
+                            self.votes = 0
                             await self.lynch()
+                            break
         elif not self.isday:
             for i in range (len(self.mafia_playerList)):
                 if b.author.id == self.mafia_playerList[i].author.id:
                     voter = self.mafia_playerList[i]
-            if voter.hasvoted:
+            if voter.player_type != "mafia":
+                await sendMessage("You are not the mafia!", b.channel)
+            elif voter.hasvoted:
                 await sendMessage("You have voted already!", b.channel)
             else:
                 for i in range (len(self.playerList)):
                     if b.mentions[0].id == self.playerList[i].author.id:
-                        self.nightvotes.append(i)
-                        if len(self.nightvotes) == len(self.playerList) - len(self.mafia_playerList):
+                        self.playerList[i].votes += 1
+                        self.votes += 1
+                        if self.votes == len(self.playerList) - len(self.mafia_playerList):
+                            self.votes = 0
                             await self.mafiakill()
 
     async def lynch(self):
         votelist = []
+        print("got to lynch")
         for i in range(len(self.playerList)):
             votelist.append(0)
-        for i in range(len(self.dayvotes)):
-            votelist[self.dayvotes[i]] = votelist[self.dayvotes[i]] + 1
-        maximum = max(votelist)
         for i in range(len(self.playerList)):
-            if votelist[i] == maximum and not self.votedone:
+            votelist[i] += self.playerList[i].votes
+        print(votelist)
+        for i in range(len(self.playerList)):
+            if votelist[i] == max(votelist) and not self.votedone:
                 self.votedone = True
-                self.playerList[votelist[i]].isdead = True
-                await sendMessage(self.playerList[votelist[i]].author.mention + " was killed!", self.b.channel)
-                self.change_time()
+                self.playerList[i].isdead = True
+                await sendMessage(self.playerList[i].author.mention + " was killed!", self.b.channel)
+                self.playerids.remove(self.playerList[i].id)
+                if self.playerList[i] in self.mafia_playerList:
+                    self.mafia_playerList.remove(self.playerList[i])
+                self.playerList.remove(self.playerList[i])
+                await self.change_time()
 
     async def mafiakill(self):
         votelist = []
         for i in range(len(self.playerList)):
             votelist.append(0)
-        for i in range(len(self.nightvotes)):
-            votelist[self.nightvotes[i]] = votelist[self.nightvotes[i]] + 1
-        maximum = max(votelist)
         for i in range(len(self.playerList)):
-            if votelist[i] == maximum and not self.votedone:
+                votelist[i] += self.playerList[i].votes
+        for i in range(len(self.playerList)):
+            if votelist[i] == max(votelist) and not self.votedone:
                 self.votedone = True
-                self.playerList[votelist[i]].willkill = True
+                self.playerList[i].will_kill = True
+                print(str(self.playerList[votelist[i]].will_kill) + str(self.playerList[votelist[i]].name))
                 await self.endnight()
 
     async def endnight(self):
         self.dones += 1
+        print(self.dones)
         if self.dones == 3:
             self.dones = 0
-            self.change_time()
+            await self.change_time()
 
     async def heal(self, b):
         isdoctor = False
@@ -383,9 +408,10 @@ class MGameManager(object):
         elif toheal.is_dead:
             await sendMessage("This person is dead...", b.channel)
         else:
-            toheal.willheal = True
+            toheal.will_heal = True
             await sendMessage("You healed " + toheal.author.display_name + ".", b.channel)
             self.healdone = True
+            await self.endnight()
 
     async def detect(self, b):
         isdetective = False
@@ -414,6 +440,7 @@ class MGameManager(object):
                 what = "is not in the mafia."
             await sendMessage(todetect.author.display_name + " is " + what, b.channel)
             self.detectdone = True
+            await self.endnight()
 
 class MPlayer(object):
     def __init__(self, player):
@@ -427,12 +454,14 @@ class MPlayer(object):
         self.author = player.author
         self.channel = player.channel
         self.hasvoted = False
+        self.votes = 0
 
     def reset(self):
         self.will_kill = False
         self.will_heal = False
         self.is_done = False
         self.hasvoted = False
+        self.votes = 0
 
 
 async def mstart(a, b):
