@@ -555,7 +555,7 @@ async def image(a, b):
 async def mhelp(a, b):
     await sendMessage("tested", b.channel)
 async def rpshelp(a, b):
-    await sendMessage("", b.channel)
+    await sendMessage("To start a new Rock Paper Scissors Game, make use the rpscreate command to create a new game, rpsjoin to join an existing game, and rpsstart to start the game!", b.channel)
     # TODO: write the helpy thingy
 async def changepostfix(a,b):
     postfixes[b.server.id] = a[0]
