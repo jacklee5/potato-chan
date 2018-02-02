@@ -280,6 +280,11 @@ class MGameManager(object):
             self.isday = not self.isday
             for i in range(len(self.playerList)):
                 self.playerList[i].reset()
+            self.healdone = False
+            self.killdone = False
+            self.votedone = False
+            self.detectdone = False
+            self.votes = 0
             if self.isday:
                 await self.day()
             if not self.isday:
