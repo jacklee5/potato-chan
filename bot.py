@@ -531,7 +531,6 @@ def getAccount(user):
     else:
         user_data[user.id] = Player(user)
         return user_data[user.id]
-
 async def send(text, channel):
     await client.send_typing(channel)
     await asyncio.sleep(TYPING_SPEED)
@@ -619,7 +618,8 @@ async def profile(a,b):
         account = getAccount(b.author)
     else:
         account = getAccount(b.mentions[0])
-    await sendMessage("**Profile for %s**\n**Potato Pounds: ** %d" % (account.name, account.pounds), b.channel)
+    pounds = account.pounds
+    await sendMessage("**Profile for %s**\n**Potato Pounds: ** %d\n**Level: **: %d" % (account.name, pounds, pounds ** .5), b.channel)
 
 
 commands = {
