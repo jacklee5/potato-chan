@@ -664,11 +664,11 @@ commands = {
         "desc": "If it is the night, a detective can check if an alive person is a part of the mafia or innocent!",
         "params": "[player]",
     },
-    "changepostfix":{
-        "run": changepostfix,
-        "params": "[newpostfix]",
-        "desc": "Change the postfix for this bot"
-    },
+    # "changepostfix":{
+    #     "run": changepostfix,
+    #     "params": "[newpostfix]",
+    #     "desc": "Change the postfix for this bot"
+    # },
     "rpscreate": {
         "run": rpscreate,
         "desc": "Create a new Rock, Paper, Scissors game in the current channel."
